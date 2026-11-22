@@ -1,7 +1,12 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import connectDB from './db.js';
+import Note from './noteModel.js';
+
+connectDB();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,49 +17,55 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-let data = [
-  { id: 1, note: 'I am learning Node.js' },
-  { id: 2, note: 'I am learning Express.js' },
-  { id: 3, note: 'Why am I Alive?' },
-];
-
 // Serve the Apple Notes frontend on GET /
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // GET Request - READING DATA (JSON)
-app.get('/notes', (req, res) => {
-  res.json(data);
+app.get('/notes', async (req, res) => {
+  let notes = await Note.find();
+  res.json(notes);
 });
 
 // POST Request - CREATING DATA
-app.post('/', (req, res) => {
+app.post('/', async (req, res) => {
   const { note } = req.body;
-  const nextId = data.reduce((max, item) => Math.max(max, item.id), 0) + 1;
-  data.push({ id: nextId, note });
+  await Note.create({ content: note });
 
   res.status(201).send('Note added successfully!');
 });
 
 // PUT Request - UPDATING DATA
 app.put('/', (req, res) => {
-  const { id, note } = req.body;
-  const index = data.findIndex((item) => item.id === id);
-  if (index !== -1) {
-    data[index] = { id, note };
-    res.send('Note updated successfully!');
-  } else {
-    res.status(404).send('Note not found.');
-  }
+
+    const { id, note } = req.body;
+
+    Note.findByIdAndUpdate(id, {content : note}, {new: true}).then((updatedNote) => {
+
+        if (updatedNote) {
+
+            res.send('Note updated successfully!');
+
+        } else {
+
+            res.status(404).send('Note not found.');
+
+        }
+
+    }).catch((error) => {
+
+        res.status(500).send('Error updating note: ' + error.message);
+
+    });
+
 });
 
 // DELETE Request - DELETING DATA
-app.delete('/', (req, res) => {
+app.delete('/', async (req, res) => {
   const { id } = req.body;
-  const index = data.findIndex((item) => item.id === id);
-  if (index !== -1) {
-    data.splice(index, 1);
+  const deleted = await Note.findByIdAndDelete(id);
+  if (deleted) {
     res.send('Note deleted successfully.');
   } else {
     res.status(404).send('Note not found.');
